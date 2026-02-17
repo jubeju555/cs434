@@ -1,0 +1,123 @@
+User: [02/16/26]seed@VM:~$ ping -c 2 192.168.56.104
+PING 192.168.56.104 (192.168.56.104) 56(84) bytes of data.
+64 bytes from 192.168.56.104: icmp_seq=1 ttl=64 time=1.01 ms
+64 bytes from 192.168.56.104: icmp_seq=2 ttl=64 time=0.979 ms
+
+--- 192.168.56.104 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1002ms
+rtt min/avg/max/mdev = 0.979/0.994/1.010/0.035 ms
+[02/16/26]seed@VM:~$ sudo sh -c 'printf "nameserver 192.168.56.104\n" > /etc/resolvconf/resolv.conf.d/head'
+[02/16/26]seed@VM:~$ sudo resolvconf -u
+[02/16/26]seed@VM:~$ dig @192.168.56.104 www.google.com
+
+; <<>> DiG 9.10.3-P4-Ubuntu <<>> @192.168.56.104 www.google.com
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 23953
+;; flags: qr rd ra; QUERY: 1, ANSWER: 8, AUTHORITY: 4, ADDITIONAL: 9
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;www.google.com.			IN	A
+
+;; ANSWER SECTION:
+www.google.com.		300	IN	A	142.251.152.119
+www.google.com.		300	IN	A	142.251.150.119
+www.google.com.		300	IN	A	142.251.154.119
+www.google.com.		300	IN	A	142.251.156.119
+www.google.com.		300	IN	A	142.251.155.119
+www.google.com.		300	IN	A	142.251.157.119
+www.google.com.		300	IN	A	142.251.151.119
+www.google.com.		300	IN	A	142.251.153.119
+
+;; AUTHORITY SECTION:
+google.com.		172800	IN	NS	ns4.google.com.
+google.com.		172800	IN	NS	ns3.google.com.
+google.com.		172800	IN	NS	ns1.google.com.
+google.com.		172800	IN	NS	ns2.google.com.
+
+;; ADDITIONAL SECTION:
+ns1.google.com.		172800	IN	A	216.239.32.10
+ns1.google.com.		172800	IN	AAAA	2001:4860:4802:32::a
+ns2.google.com.		172800	IN	A	216.239.34.10
+ns2.google.com.		172800	IN	AAAA	2001:4860:4802:34::a
+ns3.google.com.		172800	IN	A	216.239.36.10
+ns3.google.com.		172800	IN	AAAA	2001:4860:4802:36::a
+ns4.google.com.		172800	IN	A	216.239.38.10
+ns4.google.com.		172800	IN	AAAA	2001:4860:4802:38::a
+
+;; Query time: 205 msec
+;; SERVER: 192.168.56.104#53(192.168.56.104)
+;; WHEN: Mon Feb 16 20:22:47 EST 2026
+;; MSG SIZE  rcvd: 419
+
+[02/16/26]seed@VM:~$ 
+
+
+DNS Server: [02/16/26]seed@VM:~$ sudo nano /etc/bind/named.conf
+[02/16/26]seed@VM:~$ sudo nano /etc/bind/example.com.db
+[02/16/26]seed@VM:~$ sudo nano /etc/bind/192.168.56.db
+[02/16/26]seed@VM:~$ sudo service bind9 restart
+[02/16/26]seed@VM:~$ dig @192.168.56.104 www.example.com
+
+; <<>> DiG 9.10.3-P4-Ubuntu <<>> @192.168.56.104 www.example.com
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 18785
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 2
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;www.example.com.		IN	A
+
+;; ANSWER SECTION:
+www.example.com.	259200	IN	A	192.168.56.101
+
+;; AUTHORITY SECTION:
+example.com.		259200	IN	NS	ns.example.com.
+
+;; ADDITIONAL SECTION:
+ns.example.com.		259200	IN	A	192.168.56.104
+
+;; Query time: 0 msec
+;; SERVER: 192.168.56.104#53(192.168.56.104)
+;; WHEN: Mon Feb 16 20:26:20 EST 2026
+;; MSG SIZE  rcvd: 93
+
+[02/16/26]seed@VM:~$ 
+[02/16/26]seed@VM:~$ dig @192.168.56.104 -x 192.168.56.101
+
+; <<>> DiG 9.10.3-P4-Ubuntu <<>> @192.168.56.104 -x 192.168.56.101
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 22254
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 2
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;101.56.168.192.in-addr.arpa.	IN	PTR
+
+;; ANSWER SECTION:
+101.56.168.192.in-addr.arpa. 259200 IN	PTR	www.example.com.
+
+;; AUTHORITY SECTION:
+56.168.192.in-addr.arpa. 259200	IN	NS	ns.example.com.
+
+;; ADDITIONAL SECTION:
+ns.example.com.		259200	IN	A	192.168.56.104
+
+;; Query time: 0 msec
+;; SERVER: 192.168.56.104#53(192.168.56.104)
+;; WHEN: Mon Feb 16 20:26:53 EST 2026
+;; MSG SIZE  rcvd: 118
+
+[02/16/26]seed@VM:~$ 
+
+Attack
+
