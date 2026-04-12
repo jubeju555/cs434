@@ -1,0 +1,213 @@
+COSC 434/534 Lab 4 Report
+Idle Scan, ARP Poisoning, and Network Packet Analysis
+
+Name: Judah  
+Date: April 11, 2026
+
+==================================================
+Task 1: Idle Scan
+==================================================
+
+Environment and roles:
+- A: Windows 7 zombie, 192.168.43.138
+- B: Kali attacker, 192.168.43.128
+- C: Kali target, 192.168.43.129
+- All hosts were on subnet 192.168.43.0/24
+- Connectivity verified with ping between all hosts
+- Windows firewall disabled on A
+
+Q1. Setup for the attack
+The idle scan used three hosts:
+- A (Windows) as the zombie with predictable IP ID behavior
+- B (Kali) as the attacker running hping3
+- C (Kali) as the target host
+
+Commands on B:
+- hping3 -r 192.168.43.138
+- hping3 192.168.43.129 -a 192.168.43.138 -S -p 80 -c 5
+- hping3 192.168.43.129 -a 192.168.43.138 -S -p 22 -c 5
+
+Q2. Attack results
+- Initial probing of A showed predictable +1 style IP ID increments.
+- Probing open port 80 produced larger IP ID jumps (often +2 or more).
+- Probing closed port 22 produced near-baseline increments (about +1).
+- On C, packets appeared to originate from A due to source spoofing.
+- Spoofed scan output on B can show 100 percent packet loss, which is expected because responses return to A, not B.
+
+Q3. Interpretation
+- Initial probing: IP ID increases by about +1 each probe.
+- Open port probing: larger jumps due to extra traffic caused by spoofed interaction.
+- Closed port probing: near-baseline increments.
+- Offending host from target perspective: A (192.168.43.138).
+
+Conclusion:
+Idle scan succeeded using IP ID side-channel inference instead of direct scan responses.
+
+==================================================
+Task 2: ARP Poisoning
+==================================================
+
+Goal:
+Perform ARP poisoning MITM between A and C using B with ettercap.
+
+Attack command on B:
+- echo 1 > /proc/sys/net/ipv4/ip_forward
+- ettercap -T -M arp /192.168.43.138/ /192.168.43.129/
+
+Q4. ARP cache before poisoning
+Commands used:
+- A (Windows): arp -a
+- B (Kali): arp -an
+- C (Kali): arp -an
+
+Observed MAC addresses:
+- A (192.168.43.138): 00:50:56:29:31:6d
+- B (192.168.43.128): 00:0c:29:67:dd:23
+- C (192.168.43.129): 00:0c:29:5f:ac:00
+
+Observed ARP entries before attack:
+- A: 192.168.43.128 -> 00-0c-29-67-dd-23, 192.168.43.129 -> 00-0c-29-5f-ac-00
+- B: 192.168.43.138 -> 00:50:56:29:31:6d, 192.168.43.129 -> 00:0c:29:5f:ac:00
+- C: 192.168.43.128 -> 00:0c:29:67:dd:23, 192.168.43.138 -> 00:50:56:29:31:6d
+
+Answer:
+Before poisoning, ARP caches showed correct IP-to-MAC mappings.
+
+Q5. Meaning of -M in ettercap
+- -M enables man-in-the-middle mode.
+- -M arp selects ARP poisoning as the MITM method.
+- -T selects text interface mode.
+
+Q6. ARP cache after poisoning
+Observed change on A after attack:
+- 192.168.43.129 changed from C MAC (00-0c-29-5f-ac-00) to B MAC (00-0c-29-67-dd-23)
+
+Answer:
+ARP hijacking was successful. A mapped C's IP to B's MAC, indicating MITM redirection.
+
+==================================================
+Task 3: TCP Packet Decoding
+==================================================
+
+Capture file:
+- /root/Desktop/forensics.cap
+
+Q7. tcp port 34404
+Command:
+- tcpdump -nn -r /root/Desktop/forensics.cap 'tcp port 34404'
+- tcpdump -nn -r /root/Desktop/forensics.cap 'tcp port 34404' | wc -l
+
+Answer:
+- Number of packets: 6
+- Flags in order: [S], [S.], [.], [F.], [F.], [.]
+
+Q8. tcp port 34404 and tcp[13]=2
+Command:
+- tcpdump -nn -r /root/Desktop/forensics.cap 'tcp port 34404 and tcp[13]=2'
+- tcpdump -nn -r /root/Desktop/forensics.cap 'tcp port 34404 and tcp[13]=2' | wc -l
+
+Answer:
+- Filter meaning: only SYN packets on port 34404 (flags byte equals 2)
+- Number of packets: 1
+
+Q9. Filter for SYN+ACK only
+Filter:
+- tcp[13]=18
+
+Command:
+- tcpdump -nn -r /root/Desktop/forensics.cap 'tcp[13]=18' | wc -l
+
+Answer:
+- Number of packets: 609
+- Filter used: tcp[13]=18
+
+Q10. Filter for SYN set, other flags don't care
+Filter:
+- tcp[13] & 2 != 0
+
+Command:
+- tcpdump -nn -r /root/Desktop/forensics.cap 'tcp[13] & 2 != 0' | wc -l
+
+Answer:
+- Number of packets: 1803
+- Filter used: tcp[13] & 2 != 0
+
+Q11. Alternative filter for Q10
+Filter:
+- tcp[tcpflags] & tcp-syn != 0
+
+Answer:
+- Filter used: tcp[tcpflags] & tcp-syn != 0
+
+Q12. Packet from 12.33.247.3:2545 with only SYN
+Command:
+- tcpdump -nn -vvv -X -c 1 -r /root/Desktop/forensics.cap 'src host 12.33.247.3 and src port 2545 and tcp[13]=2'
+
+Matching packet:
+- 12.33.247.3.2545 > 12.33.247.4.1984, Flags [S]
+
+TCP options reported:
+- mss 1460
+- sackOK
+- TS val 484956704 ecr 0
+- nop
+- wscale 0
+
+Q13. Hex bytes corresponding to options
+From the packet hex:
+- MSS: 02 04 05 b4 (1460)
+- SACK permitted: 04 02
+- Timestamp: 08 0a 1c e7 da 20 00 00 00 00
+- NOP: 01
+- Window scale: 03 03 00
+
+Answer:
+The option bytes and values match the decoded tcpdump output.
+
+==================================================
+Task 4: Network Forensics
+==================================================
+
+Capture file:
+- /root/Desktop/forensics.cap
+
+Q14. Identify local HTTP and DNS servers
+Method:
+- Filtered for local source IP range 12.33.0.0/16 with service source ports:
+  - HTTP: tcp src port 80
+  - DNS: udp src port 53 and tcp src port 53
+- Counted source IP occurrences.
+
+Observed local HTTP servers:
+- 12.33.247.2 (primary)
+- 12.33.247.4
+- 12.33.247.10
+
+Observed local DNS servers:
+- 12.33.247.3 (primary)
+- 12.33.246.130
+- 12.33.246.131
+
+Additional note:
+- No local DNS-over-TCP packets with src port 53 were returned in this capture.
+
+Q15. Identify remote port scanner
+Method:
+- Filtered inbound TCP SYN probes from remote hosts to local 12.33.0.0/16:
+  - tcp and dst net 12.33.0.0/16 and not src net 12.33.0.0/16 and tcp[13] & 2 != 0 and tcp[13] & 16 == 0
+- Counted unique destination ports per remote source IP.
+
+Result:
+- Primary scanner: 148.64.147.168
+
+Why:
+- It targeted the largest number of unique destination ports (562), which is consistent with port-scanning behavior.
+
+==================================================
+Final Status
+==================================================
+
+- Task 1 complete
+- Task 2 complete
+- Task 3 complete
+- Task 4 complete
