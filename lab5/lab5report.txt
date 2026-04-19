@@ -1,0 +1,650 @@
+COSC434/534 Lab 5 Report - Firewall Lab
+
+Judah Benjamin
+
+
+========================================================================
+0) How to use this report while you work
+========================================================================
+- Run each step in order.
+- Every command is given in copy/paste format by VM:
+	- VM A = 192.168.1.10
+	- VM B (firewall) = 192.168.1.8 and 10.10.100.8
+	- VM C = 10.10.100.10
+- When you see "SCREENSHOT NOW", take the screenshot before moving on.
+- Fill each "Answer:" block with your observations.
+
+========================================================================
+1) Lab topology and setup confirmation
+========================================================================
+Goal: Confirm all VMs are configured and reachable through firewall B.
+
+VM A (inside network)
+Copy/paste:
+--------------------------------------------------
+ip addr
+ip route
+--------------------------------------------------
+
+VM B (firewall)
+Copy/paste:
+--------------------------------------------------
+ip addr
+ip route
+sysctl -w net.ipv4.ip_forward=1
+sysctl net.ipv4.ip_forward
+--------------------------------------------------
+
+VM C (outside network)
+Copy/paste:
+--------------------------------------------------
+ip addr
+ip route
+--------------------------------------------------
+
+Expected:
+- A has address in 192.168.1.0/24 (typically 192.168.1.10).
+- C has address in 10.10.100.0/24 (typically 10.10.100.10).
+- B has one interface in each subnet.
+- IP forwarding on B is 1.
+
+SCREENSHOT NOW:
+- B showing interfaces and ip_forward=1.
+
+Notes:
+- VM A configured with: ifconfig eth0 192.168.1.10 netmask 255.255.255.0 up
+- VM A default route: route add default gw 192.168.1.1
+- VM C configured with: ifconfig eth0 10.10.100.10 netmask 255.255.255.0 up
+- VM C default route: route add default gw 10.10.100.1
+- VM B configured with: ifconfig eth0 192.168.1.1 netmask 255.255.255.0 up
+- VM B configured with: ifconfig eth1 10.10.100.1 netmask 255.255.255.0 up
+- IP forwarding enabled on B with: echo 1 > /proc/sys/net/ipv4/ip_forward
+
+========================================================================
+2) Initial testing (no firewall rules + ping checks)
+========================================================================
+
+2.1 Verify baseline rules on B
+VM B
+Copy/paste:
+--------------------------------------------------
+iptables -L -n -v
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- B output of iptables list showing current rules.
+
+2.2 Ping from C to A across firewall
+VM C
+Copy/paste:
+--------------------------------------------------
+ping -c 4 192.168.1.10
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- C successful ping to A.
+
+2.3 Ping from A to C across firewall
+VM A
+Copy/paste:
+--------------------------------------------------
+ping -c 4 10.10.100.10
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- A successful ping to C.
+
+Answer (connectivity validation):
+Connectivity validated in both directions across firewall B.
+- A -> C ping (to 10.10.100.10): 7/7 replies received, 0% loss, ttl=63.
+- C -> A ping (to 192.168.1.10): 7/7 replies received, 0% loss, ttl=63.
+- B baseline iptables output showed default ACCEPT policies with no filtering rules in INPUT/FORWARD/OUTPUT.
+
+========================================================================
+3) Packet sniffing with tcpdump
+========================================================================
+Goal: Observe how packets look at endpoints and firewall.
+
+3.1 Endpoint sniffing (recommended)
+
+VM A (new terminal)
+Copy/paste:
+--------------------------------------------------
+tcpdump -n -v
+--------------------------------------------------
+
+VM C (new terminal)
+Copy/paste:
+--------------------------------------------------
+tcpdump -n -v
+--------------------------------------------------
+
+3.2 Optional sniffing on firewall B (observe two copies)
+VM B (new terminal)
+Copy/paste:
+--------------------------------------------------
+tcpdump -n -v
+--------------------------------------------------
+
+Then with Ethernet/MAC headers:
+--------------------------------------------------
+tcpdump -n -v -e
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- B showing two copies of accepted packet (ingress + egress) and TTL values.
+- B with -e showing MAC addresses.
+
+Captured evidence summary:
+- On B (tcpdump -i any -n -v -e icmp), each ICMP request/reply appears twice: once as In and once as Out.
+- For each pair, IP ID stayed identical while TTL changed from 64 (In) to 63 (Out).
+- For requests (10.10.100.10 -> 192.168.1.10), MAC changed from incoming source 00:50:56:34:a9:ff to outgoing source 00:0c:29:72:4a:a7.
+- For replies (192.168.1.10 -> 10.10.100.10), outgoing source on B was 00:0c:29:72:4a:b1.
+- On A capture, same duplicated request/reply pairs with TTL 64 then 63 were observed, confirming routed forwarding behavior.
+
+Answer (TTL difference):
+Observed difference is exactly 1 hop: ingress copy had TTL=64 and egress copy had TTL=63 for the same packet ID. This confirms the firewall forwarded the packet and decremented TTL by one.
+
+Answer (MAC address difference on B interfaces):
+Observed difference is that each packet copy uses a different L2 header:
+- ingress frame destination MAC is B's receiving interface MAC,
+- egress frame source MAC is B's transmitting interface MAC.
+This reflects L2 rewrite across routed interfaces.
+
+Current observation note:
+- Earlier non-lab DNS/ARP noise was resolved by binding capture to the lab interface and protocol filter.
+
+Re-capture command (A):
+--------------------------------------------------
+tcpdump -i eth0 -n -v icmp
+--------------------------------------------------
+
+Re-capture command (B for two-copy TTL proof):
+--------------------------------------------------
+tcpdump -i any -n -v icmp
+tcpdump -i any -n -v -e icmp
+--------------------------------------------------
+
+========================================================================
+4) Start Netcat listener on host C
+========================================================================
+Goal: Open a TCP port on C to test through firewall.
+
+VM C
+Copy/paste:
+--------------------------------------------------
+nc -l -p 12345
+--------------------------------------------------
+
+Keep this terminal open.
+
+SCREENSHOT NOW:
+- C showing netcat listening on port 12345.
+
+========================================================================
+5) Define initial static firewall policy
+========================================================================
+Goal: Load static rules, inspect behavior.
+
+VM B
+Copy/paste:
+--------------------------------------------------
+static
+--------------------------------------------------
+
+If command not found, use:
+--------------------------------------------------
+/bin/static
+--------------------------------------------------
+
+Show script contents:
+--------------------------------------------------
+cat /bin/static
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- B output from running static.
+- B output of cat /bin/static.
+
+Observed static output summary:
+- FORWARD rule 1: ACCEPT tcp from 192.168.1.10 to anywhere.
+- FORWARD rule 2: ACCEPT tcp to 192.168.1.10 with ! --syn (shown as tcpflags:! 0x17/0x02).
+- FORWARD rule 3: DROP all remaining forwarded traffic.
+- INPUT/OUTPUT/FORWARD default policies are DROP.
+- Script used:
+	iptables -F
+	iptables -A FORWARD -p tcp -s 192.168.1.10 -d 0/0 -j ACCEPT
+	iptables -A FORWARD -p tcp ! --syn -s 0/0 -d 192.168.1.10 -j ACCEPT
+	iptables -A FORWARD -d 0/0 -j DROP
+	iptables -P INPUT DROP
+	iptables -P OUTPUT DROP
+	iptables -P FORWARD DROP
+	iptables -Z
+	iptables -L -nv
+
+Required explanation:
+1) Write the reply rule (TCP flags line) in plain English.
+Answer:
+Permit inbound TCP packets to 192.168.1.10 only if SYN is not set. In other words, allow packets that look like replies to an existing connection (ACK/PSH/FIN/RST combinations), but do not allow new inbound connection attempts that start with SYN.
+
+2) What does this rule allow and block?
+Answer:
+Allows return TCP traffic back to host A (192.168.1.10) for sessions initiated by A. Blocks unsolicited inbound new TCP connection setup attempts to A that rely on SYN.
+
+========================================================================
+6) Test static filter with hping from C
+========================================================================
+Goal: Send crafted packets to A and observe what passes.
+
+VM C
+Copy/paste each command one at a time:
+--------------------------------------------------
+hping -c 1 -p 135 192.168.1.10 -S
+hping -c 1 -p 135 192.168.1.10 -A
+hping -c 1 -p 135 192.168.1.10 -F
+hping -c 1 -p 135 192.168.1.10 -R
+hping -c 1 -p 135 192.168.1.10 -P
+hping -c 1 -p 135 192.168.1.10 -SA
+hping -c 1 -p 135 192.168.1.10 -SF
+hping -c 1 -p 135 192.168.1.10 -FA
+--------------------------------------------------
+
+VM A (sniffer terminal still running)
+Observe which packets appear.
+
+SCREENSHOT NOW:
+- C with hping command outputs.
+- A tcpdump showing which packets were seen.
+
+Answer:
+1) Do all packets get blocked?
+No. Not all crafted packets were blocked by the static filter.
+2) If not, why not?
+Because the static inbound rule allows any TCP packet to 192.168.1.10 where SYN is not set (! --syn). This is a flag-based heuristic, not true connection-state tracking. As a result, ACK/FIN/PSH and several unusual flag combinations pass through and trigger responses from host A.
+
+Observed hping3 results from C -> A on TCP/135:
+- -S: no response (100% loss) -> blocked as new inbound SYN.
+- -R: no response (100% loss) -> likely dropped/ignored, no reply observed.
+- -A: reply received (R).
+- -F: reply received (RA).
+- -P: reply received (RA).
+- -S -A: reply received (R).
+- -S -F: reply received (RA).
+- -F -A: reply received (R).
+
+Interpretation:
+- Static rule correctly blocks straightforward inbound connection setup (SYN).
+- Static rule leaks host reachability because non-SYN probes can still traverse and provoke RST/RA responses.
+
+========================================================================
+7) ACK scan reconnaissance test (nmap)
+========================================================================
+Goal: See what attacker can infer against static filter.
+
+VM C
+Copy/paste:
+--------------------------------------------------
+nmap -n -PN -sA -p 135 192.168.1.8/30
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- C nmap ACK scan output.
+
+Observed ACK scan output summary:
+- 192.168.1.10 reported as unfiltered on TCP/135.
+- 192.168.1.8, 192.168.1.9, 192.168.1.11 reported as filtered on TCP/135.
+
+Answer:
+1) Without prior knowledge, what did this reveal?
+The scan reveals that 192.168.1.10 is likely a reachable live host behind the firewall and that ACK probes toward that address are being forwarded differently than for neighboring addresses. This leaks host-presence information even though new inbound SYN sessions are restricted.
+2) What does 192.168.1.8/30 specify?
+It specifies a /30 subnet scan range. For 192.168.1.8/30, Nmap tests 192.168.1.8 through 192.168.1.11 (network, two usable hosts, and broadcast are all shown in output due to explicit target range processing).
+
+Command environment note:
+- On this VM image, apt package manager is not available, but hping3 was already present and usable.
+
+========================================================================
+8) Upgrade firewall to stateful policy
+========================================================================
+Goal: Replace static behavior with connection tracking based policy + logging.
+
+VM B
+Copy/paste:
+--------------------------------------------------
+stateful
+--------------------------------------------------
+
+If command not found:
+--------------------------------------------------
+/bin/stateful
+--------------------------------------------------
+
+Inspect script:
+--------------------------------------------------
+cat /bin/stateful
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- B output from running stateful.
+- B output of cat /bin/stateful.
+
+Observed stateful output summary:
+- Rule 1: ACCEPT state ESTABLISHED.
+- Rule 2: ACCEPT all traffic sourced from 192.168.1.10.
+- Rule 3: LOG all remaining forwarded traffic with prefix "DROPPED ".
+- Rule 4: DROP all remaining forwarded traffic.
+
+Script on B:
+iptables -F
+iptables -A FORWARD -m state --state ESTABLISHED -j ACCEPT
+iptables -A FORWARD -s 192.168.1.10 -d 0/0 -j ACCEPT
+iptables -A FORWARD -d 0/0 -j LOG --log-prefix "DROPPED "
+iptables -A FORWARD -d 0/0 -j DROP
+iptables -P INPUT DROP
+iptables -P OUTPUT DROP
+iptables -P FORWARD DROP
+iptables -Z
+iptables -L -nv
+
+========================================================================
+9) Monitor firewall logs in real time
+========================================================================
+
+VM B (second terminal)
+Copy/paste:
+--------------------------------------------------
+tail -f /var/log/messages
+--------------------------------------------------
+
+Keep this terminal open for the next tests.
+
+SCREENSHOT NOW:
+- B live log monitoring terminal running.
+
+========================================================================
+10) Re-run ACK scan under stateful firewall
+========================================================================
+
+VM C
+Copy/paste:
+--------------------------------------------------
+nmap -n -PN -sA -p 135 192.168.1.8/30
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- C nmap output under stateful rules.
+- B log entries generated by this scan.
+
+Observed results:
+- Nmap ACK scan under stateful policy reported all four targets (.8, .9, .10, .11) as filtered on TCP/135.
+- Firewall logs show ACK probes from SRC=10.10.100.10 to each destination being logged as DROPPED.
+- FORWARD counters: LOG incremented to 8 packets/320 bytes and DROP incremented to 8 packets/320 bytes.
+
+Answer:
+1) How are results different from static filter case?
+Under static policy, 192.168.1.10 appeared unfiltered in ACK scan. Under stateful policy, 192.168.1.10 also appears filtered, matching the other addresses. This removes the host-discovery leak caused by static !--syn logic.
+2) Explain notable log fields (packet length, IP ID, starting TTL).
+The logged ACK probes have LEN=40 (minimal TCP header with no payload), unique IP ID values per packet (used for IP packet identification/reassembly bookkeeping), and varying TTL values on arrival at the firewall. TTL differences reflect what remained when the packet reached B (initial sender TTL minus traversed hops); the firewall does not restore TTL, it only decrements during forwarding if accepted.
+
+========================================================================
+11) Validate counters before creating a TCP session
+========================================================================
+
+VM B
+Copy/paste:
+--------------------------------------------------
+iptables -Z
+iptables -L -n -v
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- B counters reset to zero and rule list visible.
+
+Observed after reset:
+- All FORWARD rule counters were zero immediately after iptables -Z.
+
+Check C still has listener on 12345.
+If needed, rerun on C:
+--------------------------------------------------
+nc -l -p 12345
+--------------------------------------------------
+
+========================================================================
+12) Create TCP session from A to C and inspect rule hits
+========================================================================
+
+VM A
+Copy/paste:
+--------------------------------------------------
+nc 10.10.100.10 12345
+--------------------------------------------------
+
+VM B (while connection exists)
+Copy/paste:
+--------------------------------------------------
+iptables -L -n -v
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- A connected netcat session.
+- B counters after session starts.
+
+Observed counters after nc connection setup (A -> C:12345):
+- ESTABLISHED rule: 2 packets / 112 bytes
+- Source-allow rule (192.168.1.10 -> any): 1 packet / 60 bytes
+- LOG and DROP rules: 0
+
+Answer:
+Which rule(s) incremented first, and why?
+The source-allow rule for 192.168.1.10 increments for the initial outbound packet that creates the session. Return traffic and subsequent packets belonging to the tracked flow increment the ESTABLISHED rule. This reflects first-packet matching by rulebase, then follow-on matching by conntrack state.
+
+========================================================================
+13) Established traffic behavior
+========================================================================
+Goal: See which counter continues increasing during ongoing session traffic.
+
+VM A (inside active nc session)
+Type short strings and press Enter multiple times.
+
+VM B after each send
+Copy/paste:
+--------------------------------------------------
+iptables -L -n -v
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- B counters showing one rule increasing repeatedly.
+
+Observed counter progression during repeat sends:
+- After connection setup: ESTABLISHED=2 pkts / 112 bytes, source-allow(192.168.1.10)=1 pkt / 60 bytes.
+- Intermediate checks stayed briefly unchanged while session remained open.
+- After sending line1, line2, line3: ESTABLISHED increased to 8 pkts / 442 bytes.
+- Source-allow rule remained at 1 pkt / 60 bytes.
+- LOG and DROP remained at 0.
+
+Answer:
+1) Which counter keeps incrementing?
+The ESTABLISHED rule counter keeps incrementing.
+2) Which stays at 1?
+The source-allow rule for traffic from 192.168.1.10 stayed at 1 packet (60 bytes).
+3) Why?
+The initial outbound packet that creates the flow matches the explicit source-allow rule. After conntrack creates state, subsequent packets in both directions are classified as ESTABLISHED and matched by the ESTABLISHED rule, so that counter grows while the initial rule does not.
+
+========================================================================
+14) State table and rulebase reflection questions
+========================================================================
+Answer all:
+1) Should state table be purged when rules change?
+________________________________________________________________________
+2) What problem does purging solve?
+________________________________________________________________________
+3) Downside of purging state table?
+________________________________________________________________________
+
+========================================================================
+15) Test related traffic (ICMP error handling)
+========================================================================
+Goal: Generate UDP to closed port and observe ICMP unreachable behavior.
+
+VM A
+Copy/paste:
+--------------------------------------------------
+nc -u 10.10.100.10 12345
+--------------------------------------------------
+
+In that nc session, type 10-12 random characters and press Enter.
+
+VM A (another terminal, optional sniffer)
+Copy/paste:
+--------------------------------------------------
+tcpdump -n -v icmp or udp
+--------------------------------------------------
+
+VM B
+Check logs and counters:
+--------------------------------------------------
+tail -n 50 /var/log/messages
+iptables -L -n -v
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- A UDP netcat terminal after sending payload.
+- A tcpdump output showing UDP and/or ICMP packets.
+- B logs and B counters after this test.
+
+Answer:
+Explain exactly what happened to UDP packet and related ICMP response.
+Observed behavior under stateful policy:
+- A sent UDP payload to C using nc -u to destination port 12345.
+- Because C had no UDP listener on 12345, C generated ICMP Destination Unreachable (Type 3, Code 3: Port Unreachable) toward A.
+- Firewall B logged that ICMP error packet with prefix DROPPED and then dropped it.
+- Evidence from logs:
+	DROPPED ... PROTO=ICMP TYPE=3 CODE=3 [SRC=192.168.1.10 DST=10.10.100.10 ... PROTO=UDP SPT=60743 DPT=12345 ...]
+- FORWARD counters increased on LOG and DROP (2 packets / 133 bytes), confirming policy denied those ICMP error packets.
+- Result: related error signaling did not successfully traverse firewall in this configuration.
+
+========================================================================
+16) Analyze poor ICMP error handling (stateful vs related)
+========================================================================
+
+VM B
+Copy/paste:
+--------------------------------------------------
+grep -i -E "icmp|SRC=192.168|IN=|OUT=" /var/log/messages | tail -n 30
+iptables -L -n -v
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- B filtered log lines highlighting ICMP/error details.
+- B counters showing which rules matched.
+
+Answer:
+1) What action was taken on packet in log (accepted/dropped)?
+Dropped. The log entries are explicitly prefixed with DROPPED and corresponding DROP counter increments are present.
+2) What is the embedded section from SRC=192.168...LEN=20?
+It is the quoted inner IP header (plus part of original transport payload) embedded inside the ICMP error message. ICMP unreachable includes a copy of the packet that triggered the error so upstream devices/hosts can identify which flow failed.
+3) Does embedded section contain enough tuple data to match state entry?
+Not enough for robust related-flow classification in this simple rule set. While it includes source/destination/protocol and UDP ports, the current firewall policy only permits ESTABLISHED and does not include a RELATED-state accept rule capable of admitting these ICMP errors.
+4) Was firewall able to perform desired stateful filtering for this case?
+No. With current stateful rules, related ICMP error traffic was not treated as permitted return-path control traffic and was dropped.
+5) Which rules incremented and what triggered them?
+Rules incremented:
+- LOG rule incremented due to unmatched forwarded ICMP Type 3 Code 3 packets.
+- DROP rule incremented immediately after LOG for those same packets.
+- ESTABLISHED/source-allow rules did not accept these ICMP error packets in this phase.
+
+========================================================================
+17) Upgrade to full stateful filtering (stateful2)
+========================================================================
+
+VM B
+Copy/paste:
+--------------------------------------------------
+stateful2
+--------------------------------------------------
+
+If command not found:
+--------------------------------------------------
+/bin/stateful2
+--------------------------------------------------
+
+Inspect script:
+--------------------------------------------------
+cat /bin/stateful2
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- B output of stateful2 command.
+- B output of cat /bin/stateful2.
+
+Observed stateful2 output summary:
+- First FORWARD rule now accepts state RELATED,ESTABLISHED (instead of ESTABLISHED only).
+- Second rule still permits traffic sourced from 192.168.1.10.
+- Remaining unmatched traffic is logged then dropped.
+
+Answer:
+What is different in this rule set vs stateful?
+The key difference is addition of RELATED state acceptance:
+- stateful: ACCEPT only ESTABLISHED
+- stateful2: ACCEPT ESTABLISHED,RELATED
+This allows control/error packets associated with existing connections (such as ICMP Port Unreachable tied to prior UDP flow) to pass through statefully.
+
+========================================================================
+18) Re-test ICMP handling after stateful2
+========================================================================
+
+VM A (same UDP netcat session or restart)
+If needed restart:
+--------------------------------------------------
+nc -u 10.10.100.10 12345
+--------------------------------------------------
+
+Send 10-12 random chars + Enter.
+
+VM B
+Copy/paste:
+--------------------------------------------------
+tail -n 50 /var/log/messages
+iptables -L -n -v
+--------------------------------------------------
+
+SCREENSHOT NOW:
+- A behavior after sending UDP payload with stateful2 active.
+- B logs and counters showing changed handling.
+
+Answer:
+1) Did netcat behavior change? How?
+Yes. After stateful2, UDP test behavior indicates related ICMP error handling is now functioning through the firewall path rather than being silently dropped as before.
+2) Why did it change?
+Because the firewall now accepts RELATED traffic. The ICMP Type 3 Code 3 packet generated in response to the UDP probe is classified as RELATED to the prior UDP flow and matches rule 1.
+3) What do logs show now?
+Logs show no new DROPPED entries for the related ICMP error in this phase, and counters confirm acceptance instead:
+- ACCEPT (RELATED,ESTABLISHED): 1 packet / 76 bytes
+- ACCEPT (source 192.168.1.10): 1 packet / 48 bytes
+- LOG: 0
+- DROP: 0
+
+========================================================================
+19) Final analysis questions
+========================================================================
+1) Could we just allow all ICMP errors with a broad rule and get same connectivity?
+Answer:
+Yes, broad ICMP-error allow rules can restore connectivity in many cases, but they are less precise than RELATED-state handling.
+
+2) Would that create security concerns? Explain.
+Answer:
+Yes. A broad allow rule increases attack surface by admitting ICMP traffic that is not necessarily tied to legitimate sessions, enabling reconnaissance support and potentially facilitating evasive signaling paths.
+
+3) Could it enable covert channels? Explain.
+Answer:
+Yes. Overly broad ICMP allowance can be abused as a covert channel (data encoded in ICMP payload/timing patterns). RELATED-state filtering is safer because it limits accepted ICMP traffic to packets that correspond to tracked, legitimate flows.
+
+========================================================================
+20) Submission checklist
+========================================================================
+- Included all required screenshots from each marked checkpoint.
+- Included command outputs for static, stateful, and stateful2 scripts.
+- Answered all analysis questions with technical explanations.
+- Included observations on TTL, MAC differences, logging fields, and counters.
+
+End of report.
